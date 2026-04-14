@@ -470,7 +470,7 @@ function CandidateCard({ candidate, onEdit, onDelete }) {
 }
 
 /* ─── Dashboard View ─────────────────────────────────────────────────────── */
-function DashboardView({ leads, candidates, onSelectLead, onAddLead, onEditLead, onDeleteLead, syncing, liveSync }) {
+function DashboardView({ leads, candidates, onSelectLead, onAddLead, onEditLead, onDeleteLead, syncing }) {
   const [search, setSearch] = useState('');
   const [gradeFilter, setGradeFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
@@ -512,12 +512,6 @@ function DashboardView({ leads, candidates, onSelectLead, onAddLead, onEditLead,
               <div style={{ fontSize:11, color:'#6366f1', fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
                 <div className="pulse-dot" style={{ width:6, height:6, borderRadius:'50%', background:'#6366f1' }} />
                 Syncing
-              </div>
-            )}
-            {!syncing && liveSync && (
-              <div style={{ fontSize:11, color:'#059669', fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
-                <div className="pulse-dot" style={{ width:6, height:6, borderRadius:'50%', background:'#059669' }} />
-                Live
               </div>
             )}
           </div>
@@ -896,8 +890,6 @@ function App() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [useSupabase, setUseSupabase] = useState(false);
-  const [liveSync, setLiveSync] = useState(false);
-  const realtimeCleanupRef = useRef(null);
 
   // Modals
   const [showLeadForm, setShowLeadForm] = useState(false);
@@ -911,17 +903,11 @@ function App() {
     const cfg = getSupabaseConfig();
     if (cfg?.url && cfg?.key) {
       const ok = initSupabase(cfg.url, cfg.key);
-      if (ok) {
-        setUseSupabase(true);
-        loadFromSupabase();
-        realtimeCleanupRef.current = setupRealtime();
-      }
-    } else {
-      const local = loadLocal();
-      setLeads(local.leads);
-      setCandidates(local.candidates);
+      if (ok) { setUseSupabase(true); loadFromSupabase(); return; }
     }
-    return () => { if (realtimeCleanupRef.current) realtimeCleanupRef.current(); };
+    const local = loadLocal();
+    setLeads(local.leads);
+    setCandidates(local.candidates);
   }, []);
 
   async function loadFromSupabase() {
@@ -934,44 +920,6 @@ function App() {
       setLeads(l || []);
       setCandidates(c || []);
     } catch { /* fall through */ } finally { setSyncing(false); }
-  }
-
-  function setupRealtime() {
-    if (!supabaseClient) return () => {};
-
-    const leadsChannel = supabaseClient
-      .channel('realtime-leads')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setLeads(prev => prev.find(l => l.id === payload.new.id) ? prev : [payload.new, ...prev]);
-        } else if (payload.eventType === 'UPDATE') {
-          setLeads(prev => prev.map(l => l.id === payload.new.id ? payload.new : l));
-          setSelectedLead(prev => prev?.id === payload.new.id ? payload.new : prev);
-        } else if (payload.eventType === 'DELETE') {
-          setLeads(prev => prev.filter(l => l.id !== payload.old.id));
-          setSelectedLead(prev => { if (prev?.id === payload.old.id) { setView('dashboard'); return null; } return prev; });
-        }
-      })
-      .subscribe((status) => { if (status === 'SUBSCRIBED') setLiveSync(true); });
-
-    const candidatesChannel = supabaseClient
-      .channel('realtime-candidates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_candidates' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setCandidates(prev => prev.find(c => c.id === payload.new.id) ? prev : [...prev, payload.new]);
-        } else if (payload.eventType === 'UPDATE') {
-          setCandidates(prev => prev.map(c => c.id === payload.new.id ? payload.new : c));
-        } else if (payload.eventType === 'DELETE') {
-          setCandidates(prev => prev.filter(c => c.id !== payload.old.id));
-        }
-      })
-      .subscribe();
-
-    return () => {
-      setLiveSync(false);
-      supabaseClient.removeChannel(leadsChannel);
-      supabaseClient.removeChannel(candidatesChannel);
-    };
   }
 
   /* Persist */
@@ -1055,12 +1003,7 @@ function App() {
     const cfg = getSupabaseConfig();
     if (cfg) {
       const ok = initSupabase(cfg.url, cfg.key);
-      if (ok) {
-        setUseSupabase(true);
-        loadFromSupabase();
-        if (realtimeCleanupRef.current) realtimeCleanupRef.current();
-        realtimeCleanupRef.current = setupRealtime();
-      }
+      if (ok) { setUseSupabase(true); loadFromSupabase(); }
     }
     setView('dashboard');
   }
@@ -1086,7 +1029,6 @@ function App() {
           leads={leads}
           candidates={candidates}
           syncing={syncing}
-          liveSync={liveSync}
           onSelectLead={(lead) => { setSelectedLead(lead); setView('detail'); }}
           onAddLead={() => setShowLeadForm(true)}
           onEditLead={(lead) => setEditingLead(lead)}

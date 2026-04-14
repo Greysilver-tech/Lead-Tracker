@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="GS Leads" />
+  <title>Greysilver Lead Tracker</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f0f2f5;
+      -webkit-font-smoothing: antialiased;
+      overscroll-behavior: none;
+    }
+    #root { display: flex; flex-direction: column; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    input, textarea, select {
+      font-family: inherit;
+      outline: none;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+    }
+    .safe-top { padding-top: env(safe-area-inset-top); }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(40px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .animate-fade { animation: fadeIn 0.2s ease-out; }
+    .animate-slide { animation: slideUp 0.25s ease-out; }
+    .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+    .glass {
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const { useState, useEffect, useCallback, useRef } = React;
+
+/* ─── Icons ─────────────────────────────────────────────────────────────── */
+const Icon = ({ d, size = 20, stroke = 2, color = "currentColor", fill = "none" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+    {Array.isArray(d) ? d.map((p, i) => <path key={i} d={p} />) : <path d={d} />}
+  </svg>
+);
+const icons = {
+  plus:      "M12 5v14M5 12h14",
+  edit:      "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z",
+  trash:     ["M3 6h18","M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"],
+  chevLeft:  "M15 18l-6-6 6-6",
+  chevRight: "M9 18l6-6-6-6",
+  x:         "M18 6L6 18M6 6l12 12",
+  settings:  ["M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z", "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"],
+  user:      ["M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2","M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"],
+  link:      ["M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71","M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"],
+  phone:     "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.59 2.68h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10.09a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z",
+  briefcase: ["M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z","M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"],
+  search:    ["M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z","M21 21l-4.35-4.35"],
+  flame:     "M12 2c0 0-5 5.5-5 9.5a5 5 0 0 0 10 0C17 7.5 12 2 12 2zm0 13a2 2 0 0 1-2-2c0-2 2-4 2-4s2 2 2 4a2 2 0 0 1-2 2z",
+  thermometer: ["M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"],
+  snowflake: ["M2 12h20","M12 2v20","M4.93 4.93l14.14 14.14","M19.07 4.93L4.93 19.07"],
+  trendUp:   ["M23 6l-9.5 9.5-5-5L1 18","M17 6h6v6"],
+  layers:    ["M12 2L2 7l10 5 10-5-10-5z","M2 17l10 5 10-5","M2 12l10 5 10-5"],
+  check:     "M20 6L9 17l-5-5",
+  copy:      ["M20 9H11a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2z","M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"],
+  cloud:     "M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z",
+  wifi:      ["M5 12.55a11 11 0 0 1 14.08 0","M1.42 9a16 16 0 0 1 21.16 0","M8.53 16.11a6 16 0 0 1 6.95 0","M12 20h.01"],
+};
+
+/* ─── Supabase helpers ───────────────────────────────────────────────────── */
+let supabaseClient = null;
+
+function getSupabaseConfig() {
+  try { return JSON.parse(localStorage.getItem('gs_supabase_config') || 'null'); } catch { return null; }
+}
+
+function initSupabase(url, key) {
+  try {
+    supabaseClient = supabase.createClient(url, key);
+    return true;
+  } catch { return false; }
+}
+
+const LS_KEY = 'gs_leads_data';
+
+function loadLocal() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '{"leads":[],"candidates":[]}'); } catch { return { leads: [], candidates: [] }; }
+}
+function saveLocal(data) {
+  localStorage.setItem(LS_KEY, JSON.stringify(data));
+}
+
+/* ─── Grade config ───────────────────────────────────────────────────────── */
+const GRADES = {
+  Hot:  { gradient: 'linear-gradient(135deg, #ef4444, #f97316)', dot: '#ef4444', label: 'Hot',  icon: 'flame',       text: 'text-red-600',   bg: 'rgba(239,68,68,0.1)' },
+  Warm: { gradient: 'linear-gradient(135deg, #f59e0b, #fb923c)', dot: '#f59e0b', label: 'Warm', icon: 'thermometer', text: 'text-amber-600', bg: 'rgba(245,158,11,0.1)' },
+  Cold: { gradient: 'linear-gradient(135deg, #3b82f6, #06b6d4)', dot: '#3b82f6', label: 'Cold', icon: 'snowflake',   text: 'text-blue-600',  bg: 'rgba(59,130,246,0.1)' },
+};
+const TYPES = {
+  'Market Move': { color: '#7c3aed', bg: 'rgba(124,58,237,0.1)', label: 'Market Move' },
+  'New Job':     { color: '#059669', bg: 'rgba(5,150,105,0.1)',  label: 'New Job' },
+};
+
+/* ─── Utility ────────────────────────────────────────────────────────────── */
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function fmtDate(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/* ─── Modal ──────────────────────────────────────────────────────────────── */
+function Modal({ title, onClose, children, wide }) {
+  useEffect(() => {
+    const h = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'flex-end', justifyContent:'center',
+                  background:'rgba(0,0,0,0.5)', backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)' }}
+         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="animate-slide" style={{
+        background:'#fff', borderRadius:'24px 24px 0 0', width:'100%', maxWidth: wide ? 680 : 520,
+        maxHeight:'92vh', overflow:'hidden', display:'flex', flexDirection:'column',
+        paddingBottom:'env(safe-area-inset-bottom)'
+      }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                      padding:'20px 20px 0', flexShrink:0 }}>
+          <h2 style={{ fontSize:18, fontWeight:700, color:'#1e293b' }}>{title}</h2>
+          <button onClick={onClose} style={{ background:'#f1f5f9', border:'none', cursor:'pointer',
+                  width:32, height:32, borderRadius:16, display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b' }}>
+            <Icon d={icons.x} size={16} />
+          </button>
+        </div>
+        <div style={{ overflowY:'auto', padding:'16px 20px 20px', flex:1 }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Field ──────────────────────────────────────────────────────────────── */
+function Field({ label, children, required }) {
+  return (
+    <div style={{ marginBottom:14 }}>
+      <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#64748b',
+                      textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>
+        {label}{required && <span style={{color:'#ef4444', marginLeft:2}}>*</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+const inputStyle = {
+  width:'100%', padding:'10px 12px', border:'2px solid #e2e8f0', borderRadius:10,
+  fontSize:15, color:'#1e293b', background:'#fff', transition:'border-color 0.15s',
+};
+const focusStyle = { borderColor:'#6366f1' };
+
+function TextInput({ value, onChange, placeholder, type = 'text' }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder} style={{ ...inputStyle, ...(focused ? focusStyle : {}) }}
+      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} />
+  );
+}
+
+function TextArea({ value, onChange, placeholder, rows = 3 }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <textarea value={value} onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder} rows={rows}
+      style={{ ...inputStyle, resize:'vertical', ...(focused ? focusStyle : {}) }}
+      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} />
+  );
+}
+
+function SelectInput({ value, onChange, options }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)}
+      style={{ ...inputStyle, appearance:'none', backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
+               backgroundRepeat:'no-repeat', backgroundPosition:'right 12px center', paddingRight:32, cursor:'pointer',
+               ...(focused ? focusStyle : {}) }}
+      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>
+      {options.map(o => <option key={o} value={o}>{o}</option>)}
+    </select>
+  );
+}
+
+/* ─── Lead Form ──────────────────────────────────────────────────────────── */
+function LeadForm({ initial, onSave, onClose }) {
+  const [form, setForm] = useState({
+    name: initial?.name || '',
+    company: initial?.company || '',
+    type: initial?.type || 'Market Move',
+    grade: initial?.grade || 'Warm',
+    notes: initial?.notes || '',
+  });
+  const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }));
+
+  const valid = form.name.trim().length > 0;
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (valid) onSave(form); }}>
+      <Field label="Lead Name" required>
+        <TextInput value={form.name} onChange={set('name')} placeholder="e.g. John Smith opportunity" />
+      </Field>
+      <Field label="Company / Firm">
+        <TextInput value={form.company} onChange={set('company')} placeholder="e.g. Allens" />
+      </Field>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+        <Field label="Type" required>
+          <SelectInput value={form.type} onChange={set('type')} options={['Market Move', 'New Job']} />
+        </Field>
+        <Field label="Grade" required>
+          <SelectInput value={form.grade} onChange={set('grade')} options={['Hot', 'Warm', 'Cold']} />
+        </Field>
+      </div>
+      <Field label="Notes">
+        <TextArea value={form.notes} onChange={set('notes')} placeholder="Any context about this lead…" />
+      </Field>
+      <div style={{ display:'flex', gap:10, marginTop:4 }}>
+        <button type="button" onClick={onClose} style={{
+          flex:1, padding:'12px', border:'2px solid #e2e8f0', borderRadius:12,
+          background:'#fff', cursor:'pointer', fontWeight:600, color:'#64748b', fontSize:15 }}>
+          Cancel
+        </button>
+        <button type="submit" disabled={!valid} style={{
+          flex:2, padding:'12px', border:'none', borderRadius:12, cursor: valid ? 'pointer' : 'not-allowed',
+          background: valid ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#e2e8f0',
+          fontWeight:700, color: valid ? '#fff' : '#94a3b8', fontSize:15, transition:'all 0.15s' }}>
+          {initial ? 'Save Changes' : 'Add Lead'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* ─── Candidate Form ─────────────────────────────────────────────────────── */
+function CandidateForm({ initial, onSave, onClose }) {
+  const [form, setForm] = useState({
+    full_name: initial?.full_name || '',
+    specialty: initial?.specialty || '',
+    current_firm: initial?.current_firm || '',
+    contact_info: initial?.contact_info || '',
+    linkedin_url: initial?.linkedin_url || '',
+    job_adder_url: initial?.job_adder_url || '',
+  });
+  const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }));
+  const valid = form.full_name.trim().length > 0;
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (valid) onSave(form); }}>
+      <Field label="Full Name" required>
+        <TextInput value={form.full_name} onChange={set('full_name')} placeholder="e.g. Sarah Chen" />
+      </Field>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+        <Field label="Specialty">
+          <TextInput value={form.specialty} onChange={set('specialty')} placeholder="e.g. Construction Law" />
+        </Field>
+        <Field label="Current Firm">
+          <TextInput value={form.current_firm} onChange={set('current_firm')} placeholder="e.g. Allens" />
+        </Field>
+      </div>
+      <Field label="Contact Info">
+        <TextInput value={form.contact_info} onChange={set('contact_info')} placeholder="Mobile / email" />
+      </Field>
+      <Field label="LinkedIn URL">
+        <TextInput value={form.linkedin_url} onChange={set('linkedin_url')} placeholder="https://linkedin.com/in/…" />
+      </Field>
+      <Field label="JobAdder URL">
+        <TextInput value={form.job_adder_url} onChange={set('job_adder_url')} placeholder="https://app.jobadder.com/…" />
+      </Field>
+      <div style={{ display:'flex', gap:10, marginTop:4 }}>
+        <button type="button" onClick={onClose} style={{
+          flex:1, padding:'12px', border:'2px solid #e2e8f0', borderRadius:12,
+          background:'#fff', cursor:'pointer', fontWeight:600, color:'#64748b', fontSize:15 }}>
+          Cancel
+        </button>
+        <button type="submit" disabled={!valid} style={{
+          flex:2, padding:'12px', border:'none', borderRadius:12, cursor: valid ? 'pointer' : 'not-allowed',
+          background: valid ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#e2e8f0',
+          fontWeight:700, color: valid ? '#fff' : '#94a3b8', fontSize:15, transition:'all 0.15s' }}>
+          {initial ? 'Save Changes' : 'Add Candidate'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* ─── Grade Badge ─────────────────────────────────────────────────────────── */
+function GradeBadge({ grade, small }) {
+  const g = GRADES[grade] || GRADES.Cold;
+  return (
+    <div style={{ display:'inline-flex', alignItems:'center', gap:5,
+                  background: g.bg, borderRadius: small ? 8 : 10,
+                  padding: small ? '3px 8px' : '5px 10px' }}>
+      <div style={{ width: small ? 7 : 8, height: small ? 7 : 8, borderRadius:'50%',
+                    background: g.dot }} className="pulse-dot" />
+      <span style={{ fontSize: small ? 12 : 13, fontWeight:700, color: g.dot }}>{g.label}</span>
+    </div>
+  );
+}
+
+/* ─── Type Badge ─────────────────────────────────────────────────────────── */
+function TypeBadge({ type, small }) {
+  const t = TYPES[type] || TYPES['New Job'];
+  return (
+    <span style={{ fontSize: small ? 11 : 12, fontWeight:700, color: t.color,
+                   background: t.bg, borderRadius:8, padding: small ? '2px 7px' : '3px 9px' }}>
+      {t.label}
+    </span>
+  );
+}
+
+/* ─── Lead Card ──────────────────────────────────────────────────────────── */
+function LeadCard({ lead, candidateCount, onPress, onEdit, onDelete }) {
+  const g = GRADES[lead.grade] || GRADES.Cold;
+  return (
+    <div className="animate-fade" onClick={onPress} style={{
+      background:'#fff', borderRadius:16, padding:'16px', marginBottom:10,
+      cursor:'pointer', transition:'transform 0.1s, box-shadow 0.1s',
+      boxShadow:'0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
+      borderLeft:`4px solid ${g.dot}`, position:'relative', overflow:'hidden',
+    }}
+    onMouseEnter={e => { e.currentTarget.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'; e.currentTarget.style.transform='translateY(-1px)'; }}
+    onMouseLeave={e => { e.currentTarget.style.boxShadow='0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)'; e.currentTarget.style.transform='none'; }}>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10 }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:'flex', alignItems:'center', flexWrap:'wrap', gap:6, marginBottom:6 }}>
+            <GradeBadge grade={lead.grade} small />
+            <TypeBadge type={lead.type} small />
+          </div>
+          <h3 style={{ fontSize:16, fontWeight:700, color:'#1e293b', marginBottom:2,
+                       overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+            {lead.name}
+          </h3>
+          {lead.company && (
+            <p style={{ fontSize:13, color:'#64748b', fontWeight:500 }}>{lead.company}</p>
+          )}
+        </div>
+        <div style={{ display:'flex', gap:6, flexShrink:0 }} onClick={e => e.stopPropagation()}>
+          <button onClick={onEdit} style={{ background:'#f1f5f9', border:'none', cursor:'pointer',
+                  width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b' }}>
+            <Icon d={icons.edit} size={14} />
+          </button>
+          <button onClick={onDelete} style={{ background:'#fef2f2', border:'none', cursor:'pointer',
+                  width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', color:'#ef4444' }}>
+            <Icon d={icons.trash} size={14} />
+          </button>
+        </div>
+      </div>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:10 }}>
+        <span style={{ fontSize:12, color:'#94a3b8' }}>{fmtDate(lead.created_at)}</span>
+        <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, fontWeight:600, color:'#6366f1' }}>
+          <Icon d={icons.user} size={12} color="#6366f1" />
+          {candidateCount} candidate{candidateCount !== 1 ? 's' : ''}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Candidate Card ─────────────────────────────────────────────────────── */
+function CandidateCard({ candidate, onEdit, onDelete }) {
+  const initials = candidate.full_name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+  const colors = ['#6366f1','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444'];
+  const color = colors[candidate.full_name.charCodeAt(0) % colors.length];
+
+  return (
+    <div className="animate-fade" style={{
+      background:'#fff', borderRadius:14, padding:'14px 16px', marginBottom:8,
+      boxShadow:'0 1px 3px rgba(0,0,0,0.06)', display:'flex', gap:12, alignItems:'flex-start'
+    }}>
+      <div style={{ width:42, height:42, borderRadius:12, background: color + '22',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:15, fontWeight:800, color, flexShrink:0 }}>
+        {initials}
+      </div>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:6 }}>
+          <div style={{ minWidth:0 }}>
+            <h4 style={{ fontSize:15, fontWeight:700, color:'#1e293b',
+                         overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              {candidate.full_name}
+            </h4>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:3 }}>
+              {candidate.specialty && (
+                <span style={{ fontSize:11, fontWeight:600, color:'#6366f1', background:'rgba(99,102,241,0.08)',
+                               borderRadius:6, padding:'2px 6px' }}>{candidate.specialty}</span>
+              )}
+              {candidate.current_firm && (
+                <span style={{ fontSize:11, fontWeight:600, color:'#0f172a', background:'#f1f5f9',
+                               borderRadius:6, padding:'2px 6px' }}>{candidate.current_firm}</span>
+              )}
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:4, flexShrink:0 }}>
+            <button onClick={onEdit} style={{ background:'#f1f5f9', border:'none', cursor:'pointer',
+                    width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b' }}>
+              <Icon d={icons.edit} size={12} />
+            </button>
+            <button onClick={onDelete} style={{ background:'#fef2f2', border:'none', cursor:'pointer',
+                    width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', color:'#ef4444' }}>
+              <Icon d={icons.trash} size={12} />
+            </button>
+          </div>
+        </div>
+        <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:8 }}>
+          {candidate.contact_info && (
+            <a href={`tel:${candidate.contact_info}`} onClick={e => e.stopPropagation()}
+               style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:12, color:'#64748b',
+                        textDecoration:'none', background:'#f8fafc', borderRadius:8, padding:'4px 8px' }}>
+              <Icon d={icons.phone} size={11} color="#64748b" />
+              {candidate.contact_info}
+            </a>
+          )}
+          {candidate.linkedin_url && (
+            <a href={candidate.linkedin_url} target="_blank" rel="noopener noreferrer"
+               onClick={e => e.stopPropagation()}
+               style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:12, color:'#0077b5',
+                        textDecoration:'none', background:'rgba(0,119,181,0.08)', borderRadius:8, padding:'4px 8px', fontWeight:600 }}>
+              <Icon d={icons.link} size={11} color="#0077b5" />
+              LinkedIn
+            </a>
+          )}
+          {candidate.job_adder_url && (
+            <a href={candidate.job_adder_url} target="_blank" rel="noopener noreferrer"
+               onClick={e => e.stopPropagation()}
+               style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:12, color:'#059669',
+                        textDecoration:'none', background:'rgba(5,150,105,0.08)', borderRadius:8, padding:'4px 8px', fontWeight:600 }}>
+              <Icon d={icons.briefcase} size={11} color="#059669" />
+              JobAdder
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Dashboard View ─────────────────────────────────────────────────────── */
+function DashboardView({ leads, candidates, onSelectLead, onAddLead, onEditLead, onDeleteLead, syncing, liveSync }) {
+  const [search, setSearch] = useState('');
+  const [gradeFilter, setGradeFilter] = useState('All');
+  const [typeFilter, setTypeFilter] = useState('All');
+
+  const stats = {
+    total: leads.length,
+    hot: leads.filter(l => l.grade === 'Hot').length,
+    warm: leads.filter(l => l.grade === 'Warm').length,
+    cold: leads.filter(l => l.grade === 'Cold').length,
+  };
+
+  const filtered = leads.filter(l => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || l.name.toLowerCase().includes(q) || (l.company||'').toLowerCase().includes(q);
+    const matchGrade = gradeFilter === 'All' || l.grade === gradeFilter;
+    const matchType = typeFilter === 'All' || l.type === typeFilter;
+    return matchSearch && matchGrade && matchType;
+  }).sort((a, b) => {
+    const order = { Hot: 0, Warm: 1, Cold: 2 };
+    return (order[a.grade] - order[b.grade]) || (b.created_at - a.created_at);
+  });
+
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      {/* Header */}
+      <div className="safe-top glass" style={{
+        borderBottom:'1px solid rgba(226,232,240,0.8)', flexShrink:0,
+        padding:'12px 16px 0',
+      }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+          <div>
+            <h1 style={{ fontSize:22, fontWeight:800, color:'#1e293b', letterSpacing:'-0.02em' }}>
+              <span style={{ background:'linear-gradient(135deg, #6366f1, #8b5cf6)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>GS</span> Leads
+            </h1>
+            <p style={{ fontSize:12, color:'#94a3b8', fontWeight:500 }}>{stats.total} active leads</p>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            {syncing && (
+              <div style={{ fontSize:11, color:'#6366f1', fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
+                <div className="pulse-dot" style={{ width:6, height:6, borderRadius:'50%', background:'#6366f1' }} />
+                Syncing
+              </div>
+            )}
+            {!syncing && liveSync && (
+              <div style={{ fontSize:11, color:'#059669', fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
+                <div className="pulse-dot" style={{ width:6, height:6, borderRadius:'50%', background:'#059669' }} />
+                Live
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Stats row */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:8, marginBottom:12 }}>
+          {[
+            { label:'Total', val: stats.total, color:'#6366f1', bg:'rgba(99,102,241,0.08)' },
+            { label:'Hot',   val: stats.hot,   color:'#ef4444', bg:'rgba(239,68,68,0.08)' },
+            { label:'Warm',  val: stats.warm,  color:'#f59e0b', bg:'rgba(245,158,11,0.08)' },
+            { label:'Cold',  val: stats.cold,  color:'#3b82f6', bg:'rgba(59,130,246,0.08)' },
+          ].map(s => (
+            <div key={s.label} style={{ background: s.bg, borderRadius:10, padding:'8px', textAlign:'center',
+                                        cursor: s.label !== 'Total' ? 'pointer' : 'default' }}
+                 onClick={() => s.label !== 'Total' && setGradeFilter(gradeFilter === s.label ? 'All' : s.label)}>
+              <div style={{ fontSize:20, fontWeight:800, color: s.color, lineHeight:1 }}>{s.val}</div>
+              <div style={{ fontSize:11, fontWeight:600, color: s.color, opacity:0.8, marginTop:2 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Search + filters */}
+        <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+          <div style={{ flex:1, position:'relative' }}>
+            <div style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'#94a3b8', pointerEvents:'none' }}>
+              <Icon d={icons.search} size={14} />
+            </div>
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search leads…"
+              style={{ width:'100%', padding:'8px 10px 8px 30px', border:'2px solid #e2e8f0',
+                       borderRadius:10, fontSize:14, color:'#1e293b', background:'#fff', fontFamily:'inherit' }} />
+          </div>
+          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
+            style={{ padding:'8px 10px', border:'2px solid #e2e8f0', borderRadius:10,
+                     fontSize:12, color:'#64748b', background:'#fff', fontFamily:'inherit', fontWeight:600, cursor:'pointer' }}>
+            <option>All</option>
+            <option>Market Move</option>
+            <option>New Job</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Lead list */}
+      <div style={{ flex:1, overflowY:'auto', padding:'12px 16px' }} className="safe-bottom">
+        {filtered.length === 0 ? (
+          <div style={{ textAlign:'center', padding:'48px 24px', color:'#94a3b8' }}>
+            <Icon d={icons.layers} size={40} color="#cbd5e1" />
+            <p style={{ marginTop:12, fontWeight:600, fontSize:15 }}>
+              {leads.length === 0 ? 'No leads yet' : 'No results'}
+            </p>
+            <p style={{ fontSize:13, marginTop:4 }}>
+              {leads.length === 0 ? 'Tap + to add your first lead' : 'Try adjusting your search'}
+            </p>
+          </div>
+        ) : (
+          filtered.map(lead => (
+            <LeadCard key={lead.id} lead={lead}
+              candidateCount={(candidates.filter(c => c.lead_id === lead.id)).length}
+              onPress={() => onSelectLead(lead)}
+              onEdit={(e) => { e.stopPropagation(); onEditLead(lead); }}
+              onDelete={(e) => { e.stopPropagation(); onDeleteLead(lead.id); }} />
+          ))
+        )}
+        <div style={{ height:80 }} />
+      </div>
+
+      {/* FAB */}
+      <button onClick={onAddLead} style={{
+        position:'fixed', bottom:'calc(24px + env(safe-area-inset-bottom))', right:20, zIndex:100,
+        width:56, height:56, borderRadius:28, border:'none', cursor:'pointer',
+        background:'linear-gradient(135deg, #6366f1, #8b5cf6)',
+        boxShadow:'0 4px 14px rgba(99,102,241,0.5)',
+        display:'flex', alignItems:'center', justifyContent:'center', color:'#fff',
+        transition:'transform 0.1s, box-shadow 0.1s',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.transform='scale(1.08)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(99,102,241,0.6)'; }}
+      onMouseLeave={e => { e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.boxShadow='0 4px 14px rgba(99,102,241,0.5)'; }}>
+        <Icon d={icons.plus} size={24} stroke={2.5} />
+      </button>
+    </div>
+  );
+}
+
+/* ─── Lead Detail View ───────────────────────────────────────────────────── */
+function LeadDetailView({ lead, candidates, onBack, onEditLead, onAddCandidate, onEditCandidate, onDeleteCandidate }) {
+  const g = GRADES[lead.grade] || GRADES.Cold;
+  const leadCandidates = candidates.filter(c => c.lead_id === lead.id);
+
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      {/* Header */}
+      <div className="safe-top glass" style={{
+        borderBottom:'1px solid rgba(226,232,240,0.8)', flexShrink:0, padding:'12px 16px',
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <button onClick={onBack} style={{ background:'#f1f5f9', border:'none', cursor:'pointer',
+                  width:36, height:36, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b' }}>
+            <Icon d={icons.chevLeft} size={18} />
+          </button>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+              <GradeBadge grade={lead.grade} small />
+              <TypeBadge type={lead.type} small />
+            </div>
+            <h2 style={{ fontSize:17, fontWeight:800, color:'#1e293b', marginTop:3,
+                         overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              {lead.name}
+            </h2>
+          </div>
+          <button onClick={onEditLead} style={{ background:'#f1f5f9', border:'none', cursor:'pointer',
+                  width:36, height:36, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b' }}>
+            <Icon d={icons.edit} size={16} />
+          </button>
+        </div>
+        {lead.company && (
+          <p style={{ fontSize:13, color:'#64748b', fontWeight:500, marginTop:6, paddingLeft:46 }}>{lead.company}</p>
+        )}
+      </div>
+
+      {/* Content */}
+      <div style={{ flex:1, overflowY:'auto', padding:'16px' }} className="safe-bottom">
+        {lead.notes && (
+          <div style={{ background:'#fff', borderRadius:14, padding:'14px', marginBottom:16,
+                        boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+            <p style={{ fontSize:13, fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:6 }}>Notes</p>
+            <p style={{ fontSize:14, color:'#334155', lineHeight:1.6, whiteSpace:'pre-wrap' }}>{lead.notes}</p>
+          </div>
+        )}
+
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+          <h3 style={{ fontSize:16, fontWeight:800, color:'#1e293b' }}>
+            Candidates <span style={{ fontSize:13, fontWeight:600, color:'#94a3b8' }}>({leadCandidates.length})</span>
+          </h3>
+          <button onClick={onAddCandidate} style={{
+            display:'flex', alignItems:'center', gap:6, padding:'8px 14px',
+            background:'linear-gradient(135deg, #6366f1, #8b5cf6)', border:'none', cursor:'pointer',
+            borderRadius:10, color:'#fff', fontSize:13, fontWeight:700 }}>
+            <Icon d={icons.plus} size={14} stroke={2.5} />
+            Add
+          </button>
+        </div>
+
+        {leadCandidates.length === 0 ? (
+          <div style={{ textAlign:'center', padding:'32px 24px', color:'#94a3b8', background:'#fff', borderRadius:14 }}>
+            <Icon d={icons.user} size={36} color="#cbd5e1" />
+            <p style={{ marginTop:10, fontWeight:600, fontSize:14 }}>No candidates yet</p>
+            <p style={{ fontSize:12, marginTop:4 }}>Add candidates who may suit this lead</p>
+          </div>
+        ) : (
+          leadCandidates.map(c => (
+            <CandidateCard key={c.id} candidate={c}
+              onEdit={() => onEditCandidate(c)}
+              onDelete={() => onDeleteCandidate(c.id)} />
+          ))
+        )}
+        <div style={{ height:24 }} />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Settings View ──────────────────────────────────────────────────────── */
+function SettingsView({ onBack, onSaved }) {
+  const cfg = getSupabaseConfig() || {};
+  const [url, setUrl] = useState(cfg.url || '');
+  const [key, setKey] = useState(cfg.key || '');
+  const [status, setStatus] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  const SQL = `-- Run this in Supabase SQL Editor
+create table if not exists leads (
+  id text primary key,
+  created_at bigint default extract(epoch from now()) * 1000,
+  name text not null,
+  company text,
+  type text not null,
+  grade text not null,
+  notes text
+);
+
+create table if not exists lead_candidates (
+  id text primary key,
+  created_at bigint default extract(epoch from now()) * 1000,
+  lead_id text references leads(id) on delete cascade,
+  full_name text not null,
+  specialty text,
+  current_firm text,
+  contact_info text,
+  linkedin_url text,
+  job_adder_url text
+);
+
+alter table leads enable row level security;
+alter table lead_candidates enable row level security;
+
+create policy "Allow all" on leads for all using (true) with check (true);
+create policy "Allow all" on lead_candidates for all using (true) with check (true);`;
+
+  async function handleSave() {
+    if (!url.trim() || !key.trim()) {
+      setStatus({ ok: false, msg: 'Enter both URL and API key.' });
+      return;
+    }
+    const ok = initSupabase(url.trim(), key.trim());
+    if (!ok) { setStatus({ ok: false, msg: 'Invalid config — check values.' }); return; }
+    try {
+      const { error } = await supabaseClient.from('leads').select('id').limit(1);
+      if (error) throw error;
+      localStorage.setItem('gs_supabase_config', JSON.stringify({ url: url.trim(), key: key.trim() }));
+      setStatus({ ok: true, msg: 'Connected! Data will now sync across devices.' });
+      setTimeout(() => onSaved(), 1200);
+    } catch (e) {
+      setStatus({ ok: false, msg: 'Could not reach database. Check URL/key and run the SQL setup.' });
+    }
+  }
+
+  function handleCopy() {
+    navigator.clipboard?.writeText(SQL).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  function handleClear() {
+    if (window.confirm('Disconnect Supabase? App will use local storage only.')) {
+      localStorage.removeItem('gs_supabase_config');
+      supabaseClient = null;
+      setUrl(''); setKey('');
+      setStatus({ ok: true, msg: 'Disconnected. Using local storage.' });
+    }
+  }
+
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      <div className="safe-top glass" style={{ borderBottom:'1px solid rgba(226,232,240,0.8)', flexShrink:0, padding:'12px 16px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <button onClick={onBack} style={{ background:'#f1f5f9', border:'none', cursor:'pointer',
+                  width:36, height:36, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b' }}>
+            <Icon d={icons.chevLeft} size={18} />
+          </button>
+          <h2 style={{ fontSize:18, fontWeight:800, color:'#1e293b' }}>Settings</h2>
+        </div>
+      </div>
+
+      <div style={{ flex:1, overflowY:'auto', padding:'16px' }} className="safe-bottom">
+        {/* Sync Section */}
+        <div style={{ background:'#fff', borderRadius:16, padding:'18px', marginBottom:14, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+            <Icon d={icons.cloud} size={18} color="#6366f1" />
+            <h3 style={{ fontSize:15, fontWeight:800, color:'#1e293b' }}>Supabase Sync</h3>
+          </div>
+          <p style={{ fontSize:13, color:'#64748b', lineHeight:1.5, marginBottom:14 }}>
+            Connect a free Supabase database to sync leads between your Mac and iPhone.
+            Create a free account at <a href="https://supabase.com" target="_blank" style={{ color:'#6366f1', fontWeight:600 }}>supabase.com</a> → New project → API settings.
+          </p>
+          <Field label="Project URL">
+            <TextInput value={url} onChange={setUrl} placeholder="https://xxxxxxxxxxxx.supabase.co" />
+          </Field>
+          <Field label="Anon / Public Key">
+            <TextInput value={key} onChange={setKey} placeholder="eyJhbGci…" />
+          </Field>
+          {status && (
+            <div style={{ padding:'10px 12px', borderRadius:10, marginBottom:12,
+                          background: status.ok ? 'rgba(5,150,105,0.08)' : 'rgba(239,68,68,0.08)',
+                          color: status.ok ? '#059669' : '#ef4444', fontSize:13, fontWeight:600 }}>
+              {status.msg}
+            </div>
+          )}
+          <div style={{ display:'flex', gap:10 }}>
+            <button onClick={handleSave} style={{
+              flex:2, padding:'11px', border:'none', borderRadius:10, cursor:'pointer',
+              background:'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              fontWeight:700, color:'#fff', fontSize:14 }}>
+              Connect & Verify
+            </button>
+            {cfg.url && (
+              <button onClick={handleClear} style={{
+                flex:1, padding:'11px', border:'2px solid #fee2e2', borderRadius:10, cursor:'pointer',
+                background:'#fff', fontWeight:600, color:'#ef4444', fontSize:14 }}>
+                Disconnect
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* SQL Setup */}
+        <div style={{ background:'#fff', borderRadius:16, padding:'18px', marginBottom:14, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+            <h3 style={{ fontSize:15, fontWeight:800, color:'#1e293b' }}>Database Setup SQL</h3>
+            <button onClick={handleCopy} style={{
+              display:'flex', alignItems:'center', gap:5, padding:'6px 10px', border:'none', cursor:'pointer',
+              background: copied ? 'rgba(5,150,105,0.1)' : '#f1f5f9', borderRadius:8,
+              fontSize:12, fontWeight:700, color: copied ? '#059669' : '#64748b' }}>
+              <Icon d={copied ? icons.check : icons.copy} size={12} color={copied ? '#059669' : '#64748b'} />
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <p style={{ fontSize:12, color:'#64748b', marginBottom:10, lineHeight:1.5 }}>
+            Run this once in your Supabase project → SQL Editor → New query.
+          </p>
+          <pre style={{ fontSize:11, color:'#334155', background:'#f8fafc', borderRadius:10,
+                        padding:'12px', overflowX:'auto', lineHeight:1.7, whiteSpace:'pre-wrap', wordBreak:'break-all' }}>
+            {SQL}
+          </pre>
+        </div>
+
+        {/* About */}
+        <div style={{ background:'#fff', borderRadius:16, padding:'18px', boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+          <h3 style={{ fontSize:15, fontWeight:800, color:'#1e293b', marginBottom:8 }}>About</h3>
+          <p style={{ fontSize:13, color:'#64748b', lineHeight:1.6 }}>
+            <strong style={{ color:'#1e293b' }}>Greysilver Lead Tracker</strong><br/>
+            Version 1.0 · Built for Greysilver Talent<br/><br/>
+            Add to home screen on iPhone: tap the Share button in Safari, then "Add to Home Screen" for a native-like experience.
+          </p>
+        </div>
+        <div style={{ height:24 }} />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Delete Confirm ─────────────────────────────────────────────────────── */
+function DeleteConfirm({ message, onConfirm, onCancel }) {
+  return (
+    <Modal title="Confirm Delete" onClose={onCancel}>
+      <p style={{ fontSize:15, color:'#334155', lineHeight:1.6, marginBottom:20 }}>{message}</p>
+      <div style={{ display:'flex', gap:10 }}>
+        <button onClick={onCancel} style={{
+          flex:1, padding:'12px', border:'2px solid #e2e8f0', borderRadius:12,
+          background:'#fff', cursor:'pointer', fontWeight:600, color:'#64748b', fontSize:15 }}>
+          Cancel
+        </button>
+        <button onClick={onConfirm} style={{
+          flex:1, padding:'12px', border:'none', borderRadius:12, cursor:'pointer',
+          background:'#ef4444', fontWeight:700, color:'#fff', fontSize:15 }}>
+          Delete
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ─── Bottom Nav ─────────────────────────────────────────────────────────── */
+function BottomNav({ view, onDashboard, onSettings }) {
+  return (
+    <div className="glass safe-bottom" style={{
+      borderTop:'1px solid rgba(226,232,240,0.8)', display:'flex',
+      padding:'8px 0', flexShrink:0, position:'sticky', bottom:0, zIndex:50
+    }}>
+      {[
+        { id:'dashboard', label:'Leads', icon: icons.layers, onClick: onDashboard },
+        { id:'settings',  label:'Settings', icon: icons.settings, onClick: onSettings },
+      ].map(item => {
+        const active = view === item.id || (view === 'detail' && item.id === 'dashboard');
+        return (
+          <button key={item.id} onClick={item.onClick} style={{
+            flex:1, background:'none', border:'none', cursor:'pointer', padding:'6px',
+            display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+            color: active ? '#6366f1' : '#94a3b8', transition:'color 0.15s',
+          }}>
+            <Icon d={item.icon} size={20} color={active ? '#6366f1' : '#94a3b8'} />
+            <span style={{ fontSize:10, fontWeight:active ? 700 : 500 }}>{item.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── App ────────────────────────────────────────────────────────────────── */
+function App() {
+  const [leads, setLeads] = useState([]);
+  const [candidates, setCandidates] = useState([]);
+  const [view, setView] = useState('dashboard');
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [useSupabase, setUseSupabase] = useState(false);
+  const [liveSync, setLiveSync] = useState(false);
+  const realtimeCleanupRef = useRef(null);
+
+  // Modals
+  const [showLeadForm, setShowLeadForm] = useState(false);
+  const [editingLead, setEditingLead] = useState(null);
+  const [showCandidateForm, setShowCandidateForm] = useState(false);
+  const [editingCandidate, setEditingCandidate] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null); // { type, id, message }
+
+  /* Init */
+  useEffect(() => {
+    const cfg = getSupabaseConfig();
+    if (cfg?.url && cfg?.key) {
+      const ok = initSupabase(cfg.url, cfg.key);
+      if (ok) {
+        setUseSupabase(true);
+        loadFromSupabase();
+        realtimeCleanupRef.current = setupRealtime();
+      }
+    } else {
+      const local = loadLocal();
+      setLeads(local.leads);
+      setCandidates(local.candidates);
+    }
+    return () => { if (realtimeCleanupRef.current) realtimeCleanupRef.current(); };
+  }, []);
+
+  async function loadFromSupabase() {
+    setSyncing(true);
+    try {
+      const [{ data: l }, { data: c }] = await Promise.all([
+        supabaseClient.from('leads').select('*').order('created_at', { ascending: false }),
+        supabaseClient.from('lead_candidates').select('*'),
+      ]);
+      setLeads(l || []);
+      setCandidates(c || []);
+    } catch { /* fall through */ } finally { setSyncing(false); }
+  }
+
+  function setupRealtime() {
+    if (!supabaseClient) return () => {};
+
+    const leadsChannel = supabaseClient
+      .channel('realtime-leads')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setLeads(prev => prev.find(l => l.id === payload.new.id) ? prev : [payload.new, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setLeads(prev => prev.map(l => l.id === payload.new.id ? payload.new : l));
+          setSelectedLead(prev => prev?.id === payload.new.id ? payload.new : prev);
+        } else if (payload.eventType === 'DELETE') {
+          setLeads(prev => prev.filter(l => l.id !== payload.old.id));
+          setSelectedLead(prev => { if (prev?.id === payload.old.id) { setView('dashboard'); return null; } return prev; });
+        }
+      })
+      .subscribe((status) => { if (status === 'SUBSCRIBED') setLiveSync(true); });
+
+    const candidatesChannel = supabaseClient
+      .channel('realtime-candidates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lead_candidates' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setCandidates(prev => prev.find(c => c.id === payload.new.id) ? prev : [...prev, payload.new]);
+        } else if (payload.eventType === 'UPDATE') {
+          setCandidates(prev => prev.map(c => c.id === payload.new.id ? payload.new : c));
+        } else if (payload.eventType === 'DELETE') {
+          setCandidates(prev => prev.filter(c => c.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      setLiveSync(false);
+      supabaseClient.removeChannel(leadsChannel);
+      supabaseClient.removeChannel(candidatesChannel);
+    };
+  }
+
+  /* Persist */
+  function persist(newLeads, newCandidates) {
+    saveLocal({ leads: newLeads, candidates: newCandidates });
+  }
+
+  /* ── Lead CRUD ── */
+  async function handleAddLead(form) {
+    const lead = { id: genId(), created_at: Date.now(), ...form };
+    const next = [lead, ...leads];
+    setLeads(next); persist(next, candidates); setShowLeadForm(false);
+    if (useSupabase && supabaseClient) {
+      setSyncing(true);
+      await supabaseClient.from('leads').insert(lead).catch(() => null);
+      setSyncing(false);
+    }
+  }
+
+  async function handleEditLead(form) {
+    const next = leads.map(l => l.id === editingLead.id ? { ...l, ...form } : l);
+    setLeads(next); persist(next, candidates); setEditingLead(null);
+    if (selectedLead?.id === editingLead.id) setSelectedLead(next.find(l => l.id === editingLead.id));
+    if (useSupabase && supabaseClient) {
+      setSyncing(true);
+      await supabaseClient.from('leads').update(form).eq('id', editingLead.id).catch(() => null);
+      setSyncing(false);
+    }
+  }
+
+  async function handleDeleteLead(id) {
+    const next = leads.filter(l => l.id !== id);
+    const nextC = candidates.filter(c => c.lead_id !== id);
+    setLeads(next); setCandidates(nextC); persist(next, nextC);
+    setDeleteTarget(null); setView('dashboard'); setSelectedLead(null);
+    if (useSupabase && supabaseClient) {
+      setSyncing(true);
+      await supabaseClient.from('leads').delete().eq('id', id).catch(() => null);
+      setSyncing(false);
+    }
+  }
+
+  /* ── Candidate CRUD ── */
+  async function handleAddCandidate(form) {
+    const c = { id: genId(), created_at: Date.now(), lead_id: selectedLead.id, ...form };
+    const next = [...candidates, c];
+    setCandidates(next); persist(leads, next); setShowCandidateForm(false);
+    if (useSupabase && supabaseClient) {
+      setSyncing(true);
+      await supabaseClient.from('lead_candidates').insert(c).catch(() => null);
+      setSyncing(false);
+    }
+  }
+
+  async function handleEditCandidate(form) {
+    const next = candidates.map(c => c.id === editingCandidate.id ? { ...c, ...form } : c);
+    setCandidates(next); persist(leads, next); setEditingCandidate(null);
+    if (useSupabase && supabaseClient) {
+      setSyncing(true);
+      await supabaseClient.from('lead_candidates').update(form).eq('id', editingCandidate.id).catch(() => null);
+      setSyncing(false);
+    }
+  }
+
+  async function handleDeleteCandidate(id) {
+    const next = candidates.filter(c => c.id !== id);
+    setCandidates(next); persist(leads, next); setDeleteTarget(null);
+    if (useSupabase && supabaseClient) {
+      setSyncing(true);
+      await supabaseClient.from('lead_candidates').delete().eq('id', id).catch(() => null);
+      setSyncing(false);
+    }
+  }
+
+  /* ── Routing ── */
+  function goSettings() {
+    setView('settings');
+  }
+
+  function onSettingsSaved() {
+    const cfg = getSupabaseConfig();
+    if (cfg) {
+      const ok = initSupabase(cfg.url, cfg.key);
+      if (ok) {
+        setUseSupabase(true);
+        loadFromSupabase();
+        if (realtimeCleanupRef.current) realtimeCleanupRef.current();
+        realtimeCleanupRef.current = setupRealtime();
+      }
+    }
+    setView('dashboard');
+  }
+
+  return (
+    <div style={{ height:'100%', display:'flex', flexDirection:'column', background:'#f0f2f5', maxWidth:640, margin:'0 auto', position:'relative' }}>
+
+      {/* Views */}
+      {view === 'settings' ? (
+        <SettingsView onBack={() => setView('dashboard')} onSaved={onSettingsSaved} />
+      ) : view === 'detail' && selectedLead ? (
+        <LeadDetailView
+          lead={selectedLead}
+          candidates={candidates}
+          onBack={() => { setView('dashboard'); setSelectedLead(null); }}
+          onEditLead={() => setEditingLead(selectedLead)}
+          onAddCandidate={() => setShowCandidateForm(true)}
+          onEditCandidate={(c) => setEditingCandidate(c)}
+          onDeleteCandidate={(id) => setDeleteTarget({ type:'candidate', id, message:'Remove this candidate from the lead?' })}
+        />
+      ) : (
+        <DashboardView
+          leads={leads}
+          candidates={candidates}
+          syncing={syncing}
+          liveSync={liveSync}
+          onSelectLead={(lead) => { setSelectedLead(lead); setView('detail'); }}
+          onAddLead={() => setShowLeadForm(true)}
+          onEditLead={(lead) => setEditingLead(lead)}
+          onDeleteLead={(id) => setDeleteTarget({ type:'lead', id, message:'Delete this lead and all its candidates? This cannot be undone.' })}
+        />
+      )}
+
+      <BottomNav view={view} onDashboard={() => { setView('dashboard'); setSelectedLead(null); }} onSettings={goSettings} />
+
+      {/* Modals */}
+      {showLeadForm && (
+        <Modal title="New Lead" onClose={() => setShowLeadForm(false)}>
+          <LeadForm onSave={handleAddLead} onClose={() => setShowLeadForm(false)} />
+        </Modal>
+      )}
+      {editingLead && (
+        <Modal title="Edit Lead" onClose={() => setEditingLead(null)}>
+          <LeadForm initial={editingLead} onSave={handleEditLead} onClose={() => setEditingLead(null)} />
+        </Modal>
+      )}
+      {showCandidateForm && (
+        <Modal title="Add Candidate" onClose={() => setShowCandidateForm(false)} wide>
+          <CandidateForm onSave={handleAddCandidate} onClose={() => setShowCandidateForm(false)} />
+        </Modal>
+      )}
+      {editingCandidate && (
+        <Modal title="Edit Candidate" onClose={() => setEditingCandidate(null)} wide>
+          <CandidateForm initial={editingCandidate} onSave={handleEditCandidate} onClose={() => setEditingCandidate(null)} />
+        </Modal>
+      )}
+      {deleteTarget && (
+        <DeleteConfirm
+          message={deleteTarget.message}
+          onConfirm={() => deleteTarget.type === 'lead' ? handleDeleteLead(deleteTarget.id) : handleDeleteCandidate(deleteTarget.id)}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
